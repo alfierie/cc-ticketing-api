@@ -1,22 +1,19 @@
-# Deployment Plan: Ticketing API (Track B: EC2 + Docker + ECR)
+# Deployment Plan: Ticketing API (Track C, Serverless)
 
-## Resources
+## Account and budget
+- **Account:** a personal AWS account on the **Free plan**, used because Learner Lab access wasn't available. New accounts get $100 in credits at sign-up (up to $200 total), and on the Free plan, usage is charged to those credits, not to the card.
+- **Cost:** all three services are pay-per-request, so an idle deployment costs about $0. Lambda and DynamoDB have always-free monthly allowances, and the test run's handful of API Gateway calls costs a fraction of a cent.
+- **Guardrails:** MFA on the root user, deploy as an IAM admin user (not root), a **zero-spend budget** alert in Billing → Budgets, and `teardown.sh` when finished.
 
 | Resource | Name | Config |
 |---|---|---|
-| ECR repository | `ticket-api` | Private, scan on push, tags `<git-sha>` + `latest` |
-| Security group | `ticket-api-sg` | In: tcp/80 from 0.0.0.0/0, tcp/22 from the EC2 Instance Connect range only |
-| IAM role | `ticket-api-ec2-role` | Trusted by EC2; inline policy: `ecr:GetAuthorizationToken` + push/pull on the `ticket-api` repo only; attached via instance profile `ticket-api-ec2-profile` |
-| EC2 instance | `ticket-api-host` | t3.micro (Free Tier eligible), Amazon Linux 2023, default VPC/public subnet, IMDSv2 required |
-| Container 1 | `ticket-api` | Image from ECR, Gunicorn on port 8000 → host port 80 |
-| Container 2 | `ticket-db` | `mysql:8.0`, volume `db-data`, not published |
+| DynamoDB table | `Tickets` | PK `ticketId` (S), PAY_PER_REQUEST |
+| IAM role | `tickets-api-lambda-role` | Trusted by Lambda; inline policy: CRUD on the `Tickets` table + its own log group only |
+| Lambda function | `tickets-api-fn` | python3.12, 128 MB, 10 s timeout, role `tickets-api-lambda-role`, env `TABLE_NAME=Tickets` |
+| API Gateway | `tickets-api` | HTTP API, AWS_PROXY → Lambda (payload 2.0), 5 routes, `$default` stage with auto-deploy |
+| Logs | `/aws/lambda/tickets-api-fn` | CloudWatch Logs, created automatically |
 
 Region: `us-east-1`
-
-## Account and budget
-- **Account:** a personal AWS account on the **Free plan**, used because Learner Lab access wasn't available. New accounts get $100 in credits at sign-up (up to $200 total). On the Free plan, usage is charged to those credits, not to the card.
-- **Cost:** a t3.micro is about $0.0104/hour in `us-east-1`, and ECR private storage is free up to 500 MB/month for new customers (the image is about 60 MB). A full day of testing costs well under $1 of credits.
-- **Guardrails:** MFA on the root user, deploy as an IAM admin user (not root), a **zero-spend budget** alert in Billing → Budgets, and `teardown.sh` when finished.
 
 ## Steps
 
@@ -25,49 +22,57 @@ Region: `us-east-1`
 2. Root user → Security credentials → turn on **MFA**.
 3. IAM → Users → create `diffie-admin` with console access and the `AdministratorAccess` policy, then sign in as that user from now on.
 4. Billing and Cost Management → Budgets → **Create budget** → *Zero spend budget* (sends an email alert).
-5. Set the region (top right) to **US East (N. Virginia) us-east-1** and open **CloudShell** (the `>_` icon):
+5. Set the region (top right) to **US East (N. Virginia) us-east-1** and open **CloudShell** (the `>_` icon). CloudShell already has the AWS CLI, git, and Python. Check with:
+   `aws sts get-caller-identity` (screenshot this: it proves CLI connectivity)
+
+### 1. Get the code
 ```bash
-aws sts get-caller-identity          # screenshot: CLI connectivity
+git clone https://github.com/alfierie/cc-ticketing-api.git
+cd cc-ticketing-api
+python3 -m unittest discover -s tests -v      # optional sanity check
 ```
 
-### 1. Provision AWS resources (CloudShell)
+### 2. Provision
 ```bash
-git clone https://github.com/alfierie/cc-ticketing-api.git && cd cc-ticketing-api
-bash infra/provision.sh
+bash infra/deploy.sh
 ```
-This creates the ECR repository, the IAM role with its instance profile, and the security group, then launches the EC2 instance. User data installs Docker, Docker Compose, and git, which takes about 2 minutes after the instance shows as running.
+The script does the following, in order:
+1. Creates the `Tickets` table and waits until it's ACTIVE
+2. Creates the IAM role `tickets-api-lambda-role` from `infra/iam/` (trust policy + least-privilege inline policy)
+3. Zips `src/app.py` and creates the Lambda function with that role
+4. Creates the HTTP API, the Lambda proxy integration, 5 routes, an auto-deploy `$default` stage, and the invoke permission
+5. Prints the base URL and saves it to `build/api_url.txt`
 
-### 2. Build, push, and run (on the EC2 instance)
-EC2 console → Instances → `ticket-api-host` → **Connect** → *EC2 Instance Connect* → **Connect**:
-```bash
-git clone https://github.com/alfierie/cc-ticketing-api.git && cd cc-ticketing-api
-bash infra/build_push_run.sh
-```
-Expected output: the image builds, both tags are pushed to ECR, `docker compose ps` shows `ticket-api` and `ticket-db` running (healthy), and `/health` returns `{"status":"ok","database":"up"}`.
+It's safe to re-run: existing resources are detected, the role policy is re-applied, and only the Lambda code gets updated.
 
-### 3. Verify connectivity from outside (CloudShell)
+### 3. Verify connectivity
 ```bash
 bash infra/test_api.sh
 ```
-Expected status codes: health `200` → create `201` → list `200` → get `200` → update `200` → invalid body `400` → delete `204` → get `404`.
+Expected: `201` create → `200` list → `200` get → `200` update → `400` invalid body → `204` delete → `404` after delete.
 
 ### 4. Evidence to capture
-1. `aws sts get-caller-identity`
-2. `provision.sh` output
-3. `build_push_run.sh` output: build, push, `docker compose ps`, and health
-4. `test_api.sh` output
-5. Console: ECR → `ticket-api` → Images (tags and scan status)
-6. Console: EC2 → `ticket-api-host` (running, public IP, IAM role, security group)
-7. Console: IAM → Roles → `ticket-api-ec2-role` → Permissions (the least-privilege policy)
-8. Console: Security group inbound rules
-9. Browser: `http://<public-ip>/tickets`
+1. `aws sts get-caller-identity` output
+2. `deploy.sh` output showing the base URL
+3. `test_api.sh` output (all status codes)
+4. Console: DynamoDB → Tickets → *Explore items* (with a ticket present; run only the POST from the test first)
+5. Console: Lambda → tickets-api-fn (function overview showing the API Gateway trigger)
+   and Configuration → Permissions (the execution role and its DynamoDB/Logs access)
+6. Console: API Gateway → tickets-api → Routes
+7. Console: CloudWatch → Log groups → `/aws/lambda/tickets-api-fn` → latest log stream
 
 ### 5. Teardown
 ```bash
-bash infra/teardown.sh     # terminates EC2; deletes the SG, ECR repo, IAM role + instance profile
+bash infra/teardown.sh     # deletes the API, function, table, log group, and IAM role
 ```
 
+## Console fallback (no CLI)
+1. **DynamoDB** → Create table → name `Tickets`, partition key `ticketId` (String) → table settings: Customize → On-demand.
+2. **Lambda** → Create function → Author from scratch → `tickets-api-fn`, Python 3.12 → Execution role: *Create a new role with basic Lambda permissions*, then in IAM add an inline policy from `infra/iam/lambda-access-policy.json` (with the real table ARN).
+   Paste `src/app.py` into `lambda_function.py`, set Handler to `lambda_function.lambda_handler`, add env var `TABLE_NAME=Tickets`, then Deploy.
+3. **API Gateway** → Create API → HTTP API → Integration: Lambda `tickets-api-fn` → add the 5 routes → stage `$default` (auto-deploy).
+
 ## Roadmap after Week 12
-- Move `ticket-db` to Amazon RDS MySQL (managed backups), keeping the API image unchanged
-- Application Load Balancer + HTTPS, with the instance in a private subnet
-- GitHub Actions: run tests, build, and push to ECR on every push
+- Cognito user pool + JWT authorizer (only authenticated users can create or update tickets)
+- GSI on `status` so tickets can be listed by status without a Scan
+- CI pipeline: run unit tests on every push (GitHub Actions)
