@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Delete everything provision.sh created (run after grading to save Learner Lab credits).
+# Delete everything provision.sh created (run after grading so nothing keeps using credits).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 source infra/config.sh
@@ -15,3 +15,7 @@ SG_ID=$(aws ec2 describe-security-groups --filters Name=group-name,Values="$SG_N
   --query 'SecurityGroups[0].GroupId' --output text)
 [ "$SG_ID" != "None" ] && aws ec2 delete-security-group --group-id "$SG_ID" && echo "Deleted security group $SG_ID"
 aws ecr delete-repository --repository-name "$ECR_REPO" --force >/dev/null && echo "Deleted ECR repository $ECR_REPO (and its images)"
+aws iam remove-role-from-instance-profile --instance-profile-name "$INSTANCE_PROFILE" --role-name "$ROLE_NAME" 2>/dev/null
+aws iam delete-instance-profile --instance-profile-name "$INSTANCE_PROFILE" 2>/dev/null && echo "Deleted instance profile $INSTANCE_PROFILE"
+aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name ticket-api-ecr-access 2>/dev/null
+aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null && echo "Deleted IAM role $ROLE_NAME"
