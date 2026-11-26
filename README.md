@@ -3,6 +3,7 @@
 **Course:** Cloud Computing, Individual Project (Week 12: Design & AWS Setup)
 **Student:** Diffie Alfierie Iswanto (533049)
 **Track:** B, Containers (EC2 + Docker + ECR)
+**AWS environment:** personal AWS account (Free plan, `us-east-1`), because AWS Academy Learner Lab access wasn't available at the time of Week 12
 
 This is a small help-desk ticketing backend. Users submit tickets (for example, "projector in room E6 not working"), and staff read them, update their status, and close them.
 It's a JSON REST API with full CRUD on one entity, `Ticket`, packaged as Docker containers on one EC2 instance.
@@ -17,7 +18,7 @@ It's a JSON REST API with full CRUD on one entity, `Ticket`, packaged as Docker 
 | 2 | `ticket-db` | Official `mysql:8.0` | Planned and running | Stores tickets in a Docker volume; private to the Docker network, so it has no public port |
 
 Both run on one **EC2 t3.micro** (Amazon Linux 2023) and are started with **Docker Compose**.
-The EC2 instance pulls from and pushes to ECR using the Learner Lab instance profile (`LabInstanceProfile` / `LabRole`), so no access keys are stored on the server.
+The EC2 instance pushes to and pulls from ECR through its own least-privilege IAM role (`ticket-api-ec2-role`), so no access keys are stored on the server.
 
 ## Data entity: `Ticket`
 
@@ -55,7 +56,8 @@ app/                 ticket-api service (Dockerfile, Flask app, MySQL repository
 db/init.sql          MySQL schema for the tickets table
 docker-compose.yml   api + db services, private network, DB volume
 tests/               Unit tests (Flask test client + in-memory repository)
-infra/provision.sh   ECR repo, security group, and EC2 instance (AWS CLI, idempotent)
+infra/provision.sh   ECR repo, IAM role, security group, and EC2 instance (AWS CLI, idempotent)
+infra/iam/           Trust policy + least-privilege ECR policy for the EC2 role
 infra/user-data.sh   EC2 first boot: installs Docker, Compose, and git
 infra/build_push_run.sh  On EC2: build the image, push it to ECR, then docker compose up
 infra/test_api.sh    End-to-end test of every route
@@ -74,18 +76,18 @@ docker build -t ticket-api:local ./app
 docker compose up -d && curl localhost/health
 ```
 
-## Deploy to AWS Learner Lab
+## Deploy to AWS
 
 The full walkthrough is in [`docs/deployment-plan.md`](docs/deployment-plan.md). In short:
 
-1. In the Learner Lab terminal: `git clone https://github.com/alfierie/cc-ticketing-api.git && cd cc-ticketing-api && bash infra/provision.sh`
+1. In AWS CloudShell (`us-east-1`): `git clone https://github.com/alfierie/cc-ticketing-api.git && cd cc-ticketing-api && bash infra/provision.sh`
 2. EC2 console → `ticket-api-host` → **Connect** (EC2 Instance Connect), then: clone the repo and run `bash infra/build_push_run.sh`
-3. Back in the lab terminal: `bash infra/test_api.sh`
+3. Back in CloudShell: `bash infra/test_api.sh`
 4. When finished: `bash infra/teardown.sh`
 
 ## Security notes
 
 - **Network:** the security group allows only TCP 80 from the internet and TCP 22 from the EC2 Instance Connect IP range. MySQL has no published port; only the `api` container can reach it, over the private `backend` Docker network.
-- **IAM:** the EC2 instance profile (`LabInstanceProfile`) authorizes ECR login, push, and pull, so there are no AWS keys on disk. IMDSv2 is required. In a production account this would be a least-privilege role with only ECR permissions on this repository.
+- **IAM:** the EC2 role `ticket-api-ec2-role` ([`infra/iam/`](infra/iam)) can only call `ecr:GetAuthorizationToken` and push or pull on the `ticket-api` repository ARN. Its credentials are temporary (served through IMDSv2, which is required), so there are no AWS keys on disk. Deployment runs from CloudShell as an IAM admin user, not the root user.
 - **Containers:** the API runs as a non-root user, the image is scanned by ECR on push, DB passwords are generated randomly into `.env` (git-ignored), and every SQL query is parameterized.
 - **Not in scope for Week 12:** HTTPS (planned: Application Load Balancer + ACM certificate) and authentication.
