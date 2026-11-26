@@ -1,9 +1,9 @@
 # Deployment Plan: Ticketing API (Track C, Serverless)
 
 ## Account and budget
-- **Account:** a personal AWS account on the **Free plan**, used because Learner Lab access wasn't available. New accounts get $100 in credits at sign-up (up to $200 total), and on the Free plan, usage is charged to those credits, not to the card.
+- **Account:** a personal AWS account on the **new AWS experience** (an AWS project), **Free plan**, used because Learner Lab access wasn't available. New accounts get $100 in credits at sign-up (up to $200 total), and on the Free plan, usage is charged to those credits, not to the card.
 - **Cost:** all three services are pay-per-request, so an idle deployment costs about $0. Lambda and DynamoDB have always-free monthly allowances, and the test run's handful of API Gateway calls costs a fraction of a cent.
-- **Guardrails:** MFA on the root user, deploy as an IAM admin user (not root), a **zero-spend budget** alert in Billing → Budgets, and `teardown.sh` when finished.
+- **Guardrails:** short-lived credentials only (`aws login` / CloudShell, no access keys), a spend limit under AWS Settings → Billing, and `teardown.sh` when finished.
 
 | Resource | Name | Config |
 |---|---|---|
@@ -13,17 +13,17 @@
 | API Gateway | `tickets-api` | HTTP API, AWS_PROXY → Lambda (payload 2.0), 5 routes, `$default` stage with auto-deploy |
 | Logs | `/aws/lambda/tickets-api-fn` | CloudWatch Logs, created automatically |
 
-Region: `us-east-1`
+Region: `ap-southeast-2` (Sydney), the project's selected Region. In the new AWS experience, Lambda and API Gateway can't be created in `us-east-1`.
 
 ## Steps
 
 ### 0. Account setup (one time)
-1. Sign up at aws.amazon.com and choose the **Free plan**.
-2. Root user → Security credentials → turn on **MFA**.
-3. IAM → Users → create `diffie-admin` with console access and the `AdministratorAccess` policy, then sign in as that user from now on.
-4. Billing and Cost Management → Budgets → **Create budget** → *Zero spend budget* (sends an email alert).
-5. Set the region (top right) to **US East (N. Virginia) us-east-1** and open **CloudShell** (the `>_` icon). CloudShell already has the AWS CLI, git, and Python. Check with:
-   `aws sts get-caller-identity` (screenshot this: it proves CLI connectivity)
+1. Sign up for AWS with the **new AWS experience** and the **Free plan**. This creates an AWS project; its selected Region is `ap-southeast-2`.
+2. In **AWS Settings → Billing**, check the spend limit so the project can't run up charges.
+3. Open the console, confirm the Region shown is **Asia Pacific (Sydney) ap-southeast-2**, and open **CloudShell** (the `>_` icon).
+   Or, on your own machine: `aws configure set region ap-southeast-2 --profile diffie` then `aws login --region ap-southeast-2 --profile diffie`.
+4. Check access (screenshot this: it proves CLI connectivity):
+   `aws sts get-caller-identity`
 
 ### 1. Get the code
 ```bash

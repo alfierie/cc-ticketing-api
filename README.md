@@ -3,7 +3,7 @@
 **Course:** Cloud Computing, Individual Project (Week 12: Design & AWS Setup)
 **Student:** Diffie Alfierie Iswanto (533049)
 **Track:** C, Serverless (API Gateway + Lambda + DynamoDB)
-**AWS environment:** personal AWS account (Free plan, `us-east-1`), because AWS Academy Learner Lab access wasn't available at the time of Week 12
+**AWS environment:** personal AWS account on the new AWS experience (Free plan, Region `ap-southeast-2`, Sydney), because AWS Academy Learner Lab access wasn't available at the time of Week 12
 
 A small help-desk ticketing backend: users submit tickets (e.g. "projector in room E6 not working"),
 and staff read, update the status of, and close them. It exposes a REST-style JSON API with full CRUD on one entity, `Ticket`.
@@ -79,7 +79,7 @@ python3 -m unittest discover -s tests -v
 
 Full walkthrough: [`docs/deployment-plan.md`](docs/deployment-plan.md). In short:
 
-1. Sign in to the AWS console as an IAM admin user, set the region to `us-east-1`, and open **CloudShell**.
+1. Sign in to the AWS console, check that the Region is `ap-southeast-2`, and open **CloudShell** (or use the AWS CLI on your own machine after `aws login`).
 2. `git clone https://github.com/alfierie/cc-ticketing-api.git && cd cc-ticketing-api`
 3. `bash infra/deploy.sh`: creates the table, the IAM role, the function, and the API, then prints the base URL
 4. `bash infra/test_api.sh`: runs the full CRUD cycle against the live API
@@ -89,7 +89,7 @@ Full walkthrough: [`docs/deployment-plan.md`](docs/deployment-plan.md). In short
 
 - **IAM:** the Lambda execution role `tickets-api-lambda-role` ([`infra/iam/`](infra/iam)) is trusted only by `lambda.amazonaws.com`.
   It can only call `dynamodb:PutItem/GetItem/Scan/UpdateItem/DeleteItem` on the `Tickets` table ARN and write to its own
-  `/aws/lambda/tickets-api-fn` log group. Deployment runs from CloudShell as an IAM admin user, with MFA on the root user.
+  `/aws/lambda/tickets-api-fn` log group. Deployment runs from CloudShell or `aws login` sessions with short-lived credentials; no access keys are created.
 - **Invoke permission:** a Lambda resource-based policy allows only this API's ARN (`execute-api:<api-id>/*/*`) to invoke the function.
 - **Transport:** API Gateway serves HTTPS only. Input is validated with allow-listed fields and enums before it reaches DynamoDB.
 - **Not in scope for Week 12:** authentication (planned: Amazon Cognito JWT authorizer on the HTTP API).
