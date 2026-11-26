@@ -5,6 +5,8 @@
 **Track:** C, Serverless (API Gateway + Lambda + DynamoDB)
 **AWS environment:** personal AWS account on the new AWS experience (Free plan, Region `ap-southeast-2`, Sydney), because AWS Academy Learner Lab access wasn't available at the time of Week 12
 
+**Live endpoint (Week 12):** https://53hulfla3f.execute-api.ap-southeast-2.amazonaws.com (try [`/tickets`](https://53hulfla3f.execute-api.ap-southeast-2.amazonaws.com/tickets))
+
 A small help-desk ticketing backend: users submit tickets (e.g. "projector in room E6 not working"),
 and staff read, update the status of, and close them. It exposes a REST-style JSON API with full CRUD on one entity, `Ticket`.
 
@@ -77,7 +79,12 @@ python3 -m unittest discover -s tests -v
 
 ## Deploy
 
-Full walkthrough: [`docs/deployment-plan.md`](docs/deployment-plan.md). In short:
+> **How the Week 12 deployment was actually done:** CloudShell was unavailable while the new account was being verified,
+> so the stack was created by hand in the AWS console (`ap-southeast-2`), following
+> [Console deployment](docs/deployment-plan.md#console-deployment-used-for-this-submission), and tested from a laptop with `infra/test_api.sh`.
+> The scripted path below does the same thing in one command once CloudShell or `aws login` is available.
+
+Full walkthrough: [`docs/deployment-plan.md`](docs/deployment-plan.md). Scripted path:
 
 1. Sign in to the AWS console, check that the Region is `ap-southeast-2`, and open **CloudShell** (or use the AWS CLI on your own machine after `aws login`).
 2. `git clone https://github.com/alfierie/cc-ticketing-api.git && cd cc-ticketing-api`
@@ -90,6 +97,8 @@ Full walkthrough: [`docs/deployment-plan.md`](docs/deployment-plan.md). In short
 - **IAM:** the Lambda execution role `tickets-api-lambda-role` ([`infra/iam/`](infra/iam)) is trusted only by `lambda.amazonaws.com`.
   It can only call `dynamodb:PutItem/GetItem/Scan/UpdateItem/DeleteItem` on the `Tickets` table ARN and write to its own
   `/aws/lambda/tickets-api-fn` log group. Deployment runs from CloudShell or `aws login` sessions with short-lived credentials; no access keys are created.
+- **Console deployment:** the console created the function's execution role automatically; the DynamoDB statement from
+  `infra/iam/lambda-access-policy.json` (scoped to the `Tickets` table ARN) was added to it as the inline policy `tickets-api-dynamodb`.
 - **Invoke permission:** a Lambda resource-based policy allows only this API's ARN (`execute-api:<api-id>/*/*`) to invoke the function.
 - **Transport:** API Gateway serves HTTPS only. Input is validated with allow-listed fields and enums before it reaches DynamoDB.
 - **Not in scope for Week 12:** authentication (planned: Amazon Cognito JWT authorizer on the HTTP API).

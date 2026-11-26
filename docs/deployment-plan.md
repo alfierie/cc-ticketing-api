@@ -66,11 +66,23 @@ Expected: `201` create → `200` list → `200` get → `200` update → `400` i
 bash infra/teardown.sh     # deletes the API, function, table, log group, and IAM role
 ```
 
-## Console fallback (no CLI)
-1. **DynamoDB** → Create table → name `Tickets`, partition key `ticketId` (String) → table settings: Customize → On-demand.
-2. **Lambda** → Create function → Author from scratch → `tickets-api-fn`, Python 3.12 → Execution role: *Create a new role with basic Lambda permissions*, then in IAM add an inline policy from `infra/iam/lambda-access-policy.json` (with the real table ARN).
-   Paste `src/app.py` into `lambda_function.py`, set Handler to `lambda_function.lambda_handler`, add env var `TABLE_NAME=Tickets`, then Deploy.
-3. **API Gateway** → Create API → HTTP API → Integration: Lambda `tickets-api-fn` → add the 5 routes → stage `$default` (auto-deploy).
+## Console deployment (used for this submission)
+CloudShell couldn't start while the new account was being verified, so everything was created in the console, all in **ap-southeast-2 (Sydney)**:
+
+1. **DynamoDB** → Create table → name `Tickets`, partition key `ticketId` (String). The name is case-sensitive: a first attempt with `ticketID` made `PutItem` fail with `ValidationException: Missing the key ticketId`, so the table was recreated.
+2. **Lambda** → Create function → Author from scratch → `tickets-api-fn`, Python 3.12, default execution role.
+   Paste `src/app.py` into `lambda_function.py` → **Deploy** (the handler `lambda_function.lambda_handler` matches).
+   Configuration → Environment variables: `TABLE_NAME=Tickets`; General configuration: timeout 10 s.
+3. **IAM** → the function's execution role → Add permissions → Create inline policy (JSON) → the DynamoDB statement from `infra/iam/lambda-access-policy.json` with
+   `Resource: arn:aws:dynamodb:ap-southeast-2:<account-id>:table/Tickets` → name `tickets-api-dynamodb`.
+4. **Lambda → Test**: event `{"routeKey": "GET /tickets"}` returns 200, and the `POST /tickets` event returns 201.
+5. **API Gateway** → Create API → HTTP API → Build → Lambda integration `tickets-api-fn` (payload 2.0) → API name `tickets-api` → routes
+   `POST /tickets`, `GET /tickets`, `GET /tickets/{id}`, `PUT /tickets/{id}`, `DELETE /tickets/{id}` → stage `$default`, auto-deploy → Create.
+   The console adds the Lambda invoke permission for the API automatically.
+6. Invoke URL: **https://53hulfla3f.execute-api.ap-southeast-2.amazonaws.com**
+7. From a laptop: `bash infra/test_api.sh https://53hulfla3f.execute-api.ap-southeast-2.amazonaws.com`
+
+**Console teardown:** delete the API (API Gateway), the function (Lambda), the table (DynamoDB), the log group `/aws/lambda/tickets-api-fn` (CloudWatch), and the function's role (IAM).
 
 ## Roadmap after Week 12
 - Cognito user pool + JWT authorizer (only authenticated users can create or update tickets)
