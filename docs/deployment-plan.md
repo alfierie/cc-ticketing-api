@@ -23,8 +23,8 @@ Region: `us-east-1`
 
 ### 1. Get the code
 ```bash
-git clone https://github.com/<username>/<repo>.git
-cd <repo>
+git clone https://github.com/alfierie/cc-ticketing-api.git
+cd cc-ticketing-api
 python3 -m unittest discover -s tests -v      # optional sanity check
 ```
 

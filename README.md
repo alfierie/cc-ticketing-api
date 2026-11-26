@@ -24,7 +24,9 @@ Amazon DynamoDB  Tickets  (PK: ticketId, on-demand)
 Lambda logs ──► Amazon CloudWatch Logs
 ```
 
-See `docs/architecture.png` for the labeled diagram (data flow + IAM).
+![Architecture diagram](docs/architecture.png)
+
+The labeled diagram above shows the data flow (steps 1–6), IAM, the network boundary, and the deployment path.
 
 ## Data entity: `Ticket`
 
@@ -76,7 +78,7 @@ python3 -m unittest discover -s tests -v
 Full walkthrough: [`docs/deployment-plan.md`](docs/deployment-plan.md). In short:
 
 1. Start the Learner Lab and wait for the dot to turn green, then open the lab terminal.
-2. `git clone <this repo> && cd <repo>`
+2. `git clone https://github.com/alfierie/cc-ticketing-api.git && cd cc-ticketing-api`
 3. `bash infra/deploy.sh`: creates the table, the function, and the API, then prints the base URL
 4. `bash infra/test_api.sh`: runs the full CRUD cycle against the live API
 5. When finished: `bash infra/teardown.sh`
