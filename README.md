@@ -97,8 +97,10 @@ Full walkthrough: [`docs/deployment-plan.md`](docs/deployment-plan.md). Scripted
 - **IAM:** the Lambda execution role `tickets-api-lambda-role` ([`infra/iam/`](infra/iam)) is trusted only by `lambda.amazonaws.com`.
   It can only call `dynamodb:PutItem/GetItem/Scan/UpdateItem/DeleteItem` on the `Tickets` table ARN and write to its own
   `/aws/lambda/tickets-api-fn` log group. Deployment runs from CloudShell or `aws login` sessions with short-lived credentials; no access keys are created.
-- **Console deployment:** the console created the function's execution role automatically; the DynamoDB statement from
-  `infra/iam/lambda-access-policy.json` (scoped to the `Tickets` table ARN) was added to it as the inline policy `tickets-api-dynamodb`.
+- **Console deployment:** the function runs as `tickets-api-lambda-role` (trusted by Lambda), created in the IAM console with exactly two policies:
+  the customer-managed `tickets-api-dynamodb` (the DynamoDB statement from `infra/iam/lambda-access-policy.json`, scoped to the `Tickets` table ARN)
+  and the AWS-managed `AWSLambdaBasicExecutionRole` (CloudWatch Logs only). The console's default role, which had the broad `PowerUserAccess`, is no longer used.
+  Evidence: `docs/evidence/07-lambda-execution-role.png`, `08-lambda-role-permissions.png`.
 - **Invoke permission:** a Lambda resource-based policy allows only this API's ARN (`execute-api:<api-id>/*/*`) to invoke the function.
 - **Transport:** API Gateway serves HTTPS only. Input is validated with allow-listed fields and enums before it reaches DynamoDB.
 - **Not in scope for Week 12:** authentication (planned: Amazon Cognito JWT authorizer on the HTTP API).
