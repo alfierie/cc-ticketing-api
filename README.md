@@ -68,7 +68,7 @@ infra/deploy.sh     Idempotent provisioning with the AWS CLI (table, IAM role, f
 infra/iam/          Trust policy + least-privilege access policy for the Lambda role
 infra/test_api.sh   End-to-end connectivity test of every route
 infra/teardown.sh   Deletes all resources, including the IAM role and log group
-docs/               Deployment plan, architecture diagram, evidence screenshots
+docs/               Design brief (PDF), deployment plan, architecture diagram, evidence screenshots
 ```
 
 ## Run the tests locally
