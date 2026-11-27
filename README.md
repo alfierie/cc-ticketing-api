@@ -1,7 +1,7 @@
 # Ticketing API on AWS Serverless
 
 **Course:** Cloud Computing, Individual Project (Week 12: Design & AWS Setup)
-**Student:** Diffie Alfierie Iswanto (533049)
+**Student:** Diffie Alfierie Iswanto (NIM 24/533049/TK/59056)
 **Track:** C, Serverless (API Gateway + Lambda + DynamoDB)
 **AWS environment:** personal AWS account on the new AWS experience (Free plan, Region `ap-southeast-2`, Sydney), because AWS Academy Learner Lab access wasn't available at the time of Week 12
 
