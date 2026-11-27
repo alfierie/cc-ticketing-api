@@ -5,6 +5,8 @@
 **Track:** C, Serverless (API Gateway + Lambda + DynamoDB)
 **AWS environment:** personal AWS account on the new AWS experience (Free plan, Region `ap-southeast-2`, Sydney), because AWS Academy Learner Lab access wasn't available at the time of Week 12
 
+**Design brief:** [`docs/design-brief.pdf`](docs/design-brief.pdf) · **Architecture diagram:** [`docs/architecture.png`](docs/architecture.png)
+
 **Live endpoint (Week 12):** https://53hulfla3f.execute-api.ap-southeast-2.amazonaws.com (try [`/tickets`](https://53hulfla3f.execute-api.ap-southeast-2.amazonaws.com/tickets))
 
 A small help-desk ticketing backend: users submit tickets (e.g. "projector in room E6 not working"),
